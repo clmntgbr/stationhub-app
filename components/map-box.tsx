@@ -62,5 +62,5 @@ export default function MapBox() {
     }
   }, [stations])
 
-  return <div id="map" style={{ width: "100vw", height: "90vh" }} />
+  return <div id="map" style={{ width: "100vw", height: "100vh" }} />
 }
