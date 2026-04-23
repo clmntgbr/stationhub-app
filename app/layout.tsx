@@ -43,7 +43,7 @@ export default function RootLayout({
       <body>
         <ClerkProvider>
           <ThemeProvider>
-            <header className="justify-begin fixed top-0 right-0 left-0 z-50 flex h-16 items-center gap-4 p-4">
+            <header className="fixed top-4 left-4 z-50 flex w-50">
               <SignedOut>
                 <>
                   <SignInButton />

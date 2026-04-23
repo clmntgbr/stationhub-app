@@ -50,7 +50,7 @@ export default function MapBox() {
       map.remove()
       mapRef.current = null
     }
-  }, [fetchStations])
+  }, [fetchStations, longitude, latitude])
 
   useEffect(() => {
     fetchStations({
