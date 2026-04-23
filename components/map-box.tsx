@@ -2,12 +2,13 @@ import { useStation } from "@/lib/station/context"
 import { Station } from "@/lib/station/types"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
+
+const DEFAULT_CENTER: [number, number] = [
+  2.3494312437081044, 48.852473724351974,
+]
 
 export default function MapBox() {
-  const [latitude, setLatitude] = useState(48.852473724351974)
-  const [longitude, setLongitude] = useState(2.3494312437081044)
-
   const { stations, fetchStations } = useStation()
 
   const mapRef = useRef<mapboxgl.Map>(null)
@@ -18,7 +19,7 @@ export default function MapBox() {
 
     const map = new mapboxgl.Map({
       container: "map",
-      center: [longitude, latitude],
+      center: DEFAULT_CENTER,
       zoom: 12,
     })
     mapRef.current = map
@@ -33,15 +34,20 @@ export default function MapBox() {
     }
     map.on("moveend", onMoveEnd)
 
-    map.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true,
-        },
-        trackUserLocation: true,
-        showUserHeading: true,
-      })
-    )
+    const geolocate = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true,
+      },
+      fitBoundsOptions: {
+        maxZoom: 12,
+      },
+      trackUserLocation: true,
+      showUserHeading: true,
+    })
+    map.addControl(geolocate)
+    map.once("load", () => {
+      geolocate.trigger()
+    })
 
     map.addControl(new mapboxgl.NavigationControl())
 
@@ -50,15 +56,17 @@ export default function MapBox() {
       map.remove()
       mapRef.current = null
     }
-  }, [fetchStations, longitude, latitude])
+  }, [fetchStations])
 
   useEffect(() => {
     fetchStations({
-      latitude: latitude,
-      longitude: longitude,
+      latitude: DEFAULT_CENTER[1],
+      longitude: DEFAULT_CENTER[0],
       radius: 1000,
     })
-  }, [fetchStations, latitude, longitude])
+    // Intentionally once on mount; fetchStations is stable in StationProvider.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!mapRef.current || !stations?.length) {
