@@ -18,7 +18,11 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
   const fetchStations = useCallback(async () => {
     try {
       dispatch({ type: "GET_STATIONS_LOADING", payload: true })
-      const stations = await getStations()
+      const stations = await getStations({
+        latitude: 10,
+        longitude: 10,
+        radius: 1000,
+      })
       dispatch({ type: "GET_STATIONS", payload: stations })
     } catch {
       dispatch({

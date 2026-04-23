@@ -13,13 +13,24 @@ export default function MapBox() {
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
     mapboxgl.accessToken = token
 
-    mapRef.current = new mapboxgl.Map({
+    const map = new mapboxgl.Map({
       container: "map",
       center: [2.3494312437081044, 48.852473724351974],
       zoom: 12,
     })
+    mapRef.current = map
 
-    mapRef.current.addControl(
+    const onMoveEnd = () => {
+      const center = map.getCenter()
+      console.log("Map moved", {
+        lng: center.lng,
+        lat: center.lat,
+        zoom: map.getZoom(),
+      })
+    }
+    map.on("moveend", onMoveEnd)
+
+    map.addControl(
       new mapboxgl.GeolocateControl({
         positionOptions: {
           enableHighAccuracy: true,
@@ -29,7 +40,13 @@ export default function MapBox() {
       })
     )
 
-    mapRef.current.addControl(new mapboxgl.NavigationControl())
+    map.addControl(new mapboxgl.NavigationControl())
+
+    return () => {
+      map.off("moveend", onMoveEnd)
+      map.remove()
+      mapRef.current = null
+    }
   }, [])
 
   useEffect(() => {

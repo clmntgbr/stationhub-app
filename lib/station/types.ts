@@ -8,6 +8,12 @@ export interface Station {
   currentPrices: CurrentPrice[]
 }
 
+export interface GetStationsQuery {
+  latitude: number
+  longitude: number
+  radius: number
+}
+
 export interface StationState {
   stations: Station[] | null
   isLoading: boolean
