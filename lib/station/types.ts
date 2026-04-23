@@ -3,7 +3,7 @@ import { CurrentPrice } from "../price/types"
 
 export interface Station {
   name: string
-  id: string
+  externalId: string
   address: Address
   currentPrices: CurrentPrice[]
 }
