@@ -1,6 +1,9 @@
+import { Address } from "../address/types"
+
 export interface Station {
   name: string
   id: string
+  address: Address
 }
 
 export interface StationState {
