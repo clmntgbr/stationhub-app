@@ -34,6 +34,8 @@ export default function MapBox() {
       const root = document.createElement("div")
       const markerEl = document.createElement("div")
       markerEl.className = "marker marker-pop"
+      markerEl.style.backgroundImage = `url("https://docs.mapbox.com/mapbox-gl-js/assets/coffee-cup-marker.svg")`
+
       root.appendChild(markerEl)
 
       const marker = new mapboxgl.Marker({ element: root })

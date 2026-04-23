@@ -130,7 +130,6 @@
 
 .marker {
   position: relative;
-  background-image: url("https://docs.mapbox.com/mapbox-gl-js/assets/coffee-cup-marker.svg");
   background-size: contain;
   background-position-x: 50%;
   background-repeat: no-repeat;
