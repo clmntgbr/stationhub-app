@@ -24,7 +24,20 @@ export default function MapBox() {
     })
     mapRef.current = map
 
+    let allowMoveEndFetch = false
+
+    const fetchDefaultStations = () => {
+      fetchStations({
+        latitude: DEFAULT_CENTER[1],
+        longitude: DEFAULT_CENTER[0],
+        radius: 1000,
+      })
+    }
+
     const onMoveEnd = () => {
+      if (!allowMoveEndFetch) {
+        return
+      }
       const center = map.getCenter()
       fetchStations({
         latitude: center.lat,
@@ -45,8 +58,21 @@ export default function MapBox() {
       showUserHeading: true,
     })
     map.addControl(geolocate)
+
+    geolocate.on("geolocate", () => {
+      allowMoveEndFetch = true
+    })
+    geolocate.on("error", () => {
+      allowMoveEndFetch = true
+      fetchDefaultStations()
+    })
+
     map.once("load", () => {
-      geolocate.trigger()
+      const started = geolocate.trigger()
+      if (!started) {
+        allowMoveEndFetch = true
+        fetchDefaultStations()
+      }
     })
 
     map.addControl(new mapboxgl.NavigationControl())
@@ -57,16 +83,6 @@ export default function MapBox() {
       mapRef.current = null
     }
   }, [fetchStations])
-
-  useEffect(() => {
-    fetchStations({
-      latitude: DEFAULT_CENTER[1],
-      longitude: DEFAULT_CENTER[0],
-      radius: 1000,
-    })
-    // Intentionally once on mount; fetchStations is stable in StationProvider.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     if (!mapRef.current || !stations?.length) {
