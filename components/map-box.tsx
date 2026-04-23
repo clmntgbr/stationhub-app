@@ -19,6 +19,16 @@ export default function MapBox() {
       zoom: 12,
     })
 
+    mapRef.current.addControl(
+      new mapboxgl.GeolocateControl({
+        positionOptions: {
+          enableHighAccuracy: true,
+        },
+        trackUserLocation: true,
+        showUserHeading: true,
+      })
+    )
+
     mapRef.current.addControl(new mapboxgl.NavigationControl())
   }, [])
 

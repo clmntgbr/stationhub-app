@@ -1,9 +1,11 @@
 import { Address } from "../address/types"
+import { CurrentPrice } from "../price/types"
 
 export interface Station {
   name: string
   id: string
   address: Address
+  currentPrices: CurrentPrice[]
 }
 
 export interface StationState {
