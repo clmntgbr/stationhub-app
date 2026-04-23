@@ -2,10 +2,13 @@ import { useStation } from "@/lib/station/context"
 import { Station } from "@/lib/station/types"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 export default function MapBox() {
-  const { stations } = useStation()
+  const [latitude, setLatitude] = useState(48.852473724351974)
+  const [longitude, setLongitude] = useState(2.3494312437081044)
+
+  const { stations, fetchStations } = useStation()
 
   const mapRef = useRef<mapboxgl.Map>(null)
 
@@ -15,17 +18,17 @@ export default function MapBox() {
 
     const map = new mapboxgl.Map({
       container: "map",
-      center: [2.3494312437081044, 48.852473724351974],
+      center: [longitude, latitude],
       zoom: 12,
     })
     mapRef.current = map
 
     const onMoveEnd = () => {
       const center = map.getCenter()
-      console.log("Map moved", {
-        lng: center.lng,
-        lat: center.lat,
-        zoom: map.getZoom(),
+      fetchStations({
+        latitude: center.lat,
+        longitude: center.lng,
+        radius: 1000,
       })
     }
     map.on("moveend", onMoveEnd)
@@ -47,7 +50,15 @@ export default function MapBox() {
       map.remove()
       mapRef.current = null
     }
-  }, [])
+  }, [fetchStations])
+
+  useEffect(() => {
+    fetchStations({
+      latitude: latitude,
+      longitude: longitude,
+      radius: 1000,
+    })
+  }, [fetchStations, latitude, longitude])
 
   useEffect(() => {
     if (!mapRef.current || !stations?.length) {

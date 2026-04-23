@@ -1,10 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useReducer } from "react"
+import { useCallback, useReducer } from "react"
 import { getStations } from "./api"
 import { StationContext } from "./context"
 import { StationReducer } from "./reducer"
-import { StationState } from "./types"
+import { GetStationsQuery, StationState } from "./types"
 
 const initialState: StationState = {
   stations: null,
@@ -15,14 +15,10 @@ const initialState: StationState = {
 export function StationProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(StationReducer, initialState)
 
-  const fetchStations = useCallback(async () => {
+  const fetchStations = useCallback(async (query: GetStationsQuery) => {
     try {
       dispatch({ type: "GET_STATIONS_LOADING", payload: true })
-      const stations = await getStations({
-        latitude: 10,
-        longitude: 10,
-        radius: 1000,
-      })
+      const stations = await getStations(query)
       dispatch({ type: "GET_STATIONS", payload: stations })
     } catch {
       dispatch({
@@ -33,10 +29,6 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "GET_STATIONS_LOADING", payload: false })
     }
   }, [])
-
-  useEffect(() => {
-    fetchStations()
-  }, [fetchStations])
 
   return (
     <StationContext.Provider

@@ -1,10 +1,10 @@
 "use client"
 
 import { createContext, useContext } from "react"
-import { StationState } from "./types"
+import { GetStationsQuery, StationState } from "./types"
 
 export interface StationContextType extends StationState {
-  fetchStations: () => Promise<void>
+  fetchStations: (query: GetStationsQuery) => Promise<void>
 }
 
 export const StationContext = createContext<StationContextType | undefined>(
