@@ -42,7 +42,7 @@ export default function MapBox() {
       const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       const distanceInMeters = R * c
-      const radiusInKm = distanceInMeters / 1000
+      const radiusInKm = (distanceInMeters / 1000) * 1.5 // Add 50% margin
 
       fetchStations({
         latitude: DEFAULT_CENTER[1],
@@ -85,7 +85,7 @@ export default function MapBox() {
       fetchStations({
         latitude: center.lat,
         longitude: center.lng,
-        radius: radiusInKm,
+        radius: radiusInKm * 1.5, // Add 50% margin
       })
     }
     map.on("moveend", onMoveEnd)

@@ -5,6 +5,7 @@ export interface Price {
   isLowestPrice: boolean
   date: string
   type: string
+  isLowPrice: boolean
   createdAt: string
   updatedAt: string
 }

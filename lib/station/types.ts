@@ -6,6 +6,7 @@ export interface Station {
   externalId: string
   address: Address
   currentPrices: CurrentPrice[]
+  services: string[]
 }
 
 export interface GetStationsQuery {
