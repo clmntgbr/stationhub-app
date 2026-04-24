@@ -3,6 +3,8 @@ import { Station } from "@/lib/station/types"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 import { useEffect, useRef } from "react"
+import { createRoot } from "react-dom/client"
+import MapBoxPopup from "./map-box-popup"
 
 type MarkerMap = Map<string, mapboxgl.Marker>
 
@@ -97,7 +99,9 @@ export default function MapBox() {
     const map = mapRef.current
     const markers = markersRef.current
 
-    const currentStationIds = new Set(stations.map((s: Station) => s.externalId))
+    const currentStationIds = new Set(
+      stations.map((s: Station) => s.externalId)
+    )
 
     // Remove markers for stations that are no longer in the list
     markers.forEach((marker, stationId) => {
@@ -117,13 +121,14 @@ export default function MapBox() {
 
         root.appendChild(markerEl)
 
+        const popupNode = document.createElement("div")
+        createRoot(popupNode).render(<MapBoxPopup station={station} />)
+
         const marker = new mapboxgl.Marker({ element: root })
           .setLngLat([station.address.longitude, station.address.latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(`<h3>${station.name}</h3>`)
-          )
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupNode))
           .addTo(map)
-        
+
         markers.set(station.externalId, marker)
       }
     })
