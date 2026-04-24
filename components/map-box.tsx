@@ -32,25 +32,64 @@ export default function MapBox() {
     let allowMoveEndFetch = false
 
     const fetchDefaultStations = () => {
+      const bounds = map.getBounds()
+      if (!bounds) return
+
+      const center = map.getCenter()
+      const northPoint = bounds.getNorth()
+      const R = 6371000
+      const deltaLat = ((northPoint - center.lat) * Math.PI) / 180
+      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const distanceInMeters = R * c
+      const radiusInKm = distanceInMeters / 1000
+
       fetchStations({
         latitude: DEFAULT_CENTER[1],
         longitude: DEFAULT_CENTER[0],
-        radius: 1000,
+        radius: radiusInKm,
       })
     }
 
+    const calculateMapRadius = () => {
+      const bounds = map.getBounds()
+      if (!bounds) return
+
+      const center = map.getCenter()
+
+      const northPoint = bounds.getNorth()
+
+      const R = 6371000
+      const deltaLat = ((northPoint - center.lat) * Math.PI) / 180
+
+      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const distanceInMeters = R * c
+      const distanceInKm = distanceInMeters / 1000
+
+      const zoom = map.getZoom()
+      console.log(
+        `Zoom: ${zoom.toFixed(2)} | Radius (height): ${distanceInKm.toFixed(2)} km | Full height: ${(distanceInKm * 2).toFixed(2)} km | API radius: ${(distanceInKm * 1.5).toFixed(2)} km`
+      )
+
+      return distanceInKm
+    }
+
     const onMoveEnd = () => {
-      if (!allowMoveEndFetch) {
+      const radiusInKm = calculateMapRadius()
+
+      if (!allowMoveEndFetch || !radiusInKm) {
         return
       }
       const center = map.getCenter()
       fetchStations({
         latitude: center.lat,
         longitude: center.lng,
-        radius: 1000,
+        radius: radiusInKm,
       })
     }
     map.on("moveend", onMoveEnd)
+    map.on("zoomend", calculateMapRadius)
 
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: {
@@ -70,9 +109,24 @@ export default function MapBox() {
     geolocate.on("error", () => {
       allowMoveEndFetch = true
       fetchDefaultStations()
+
+      const popup = new mapboxgl.Popup({ closeOnClick: true })
+        .setLngLat(DEFAULT_CENTER)
+        .setHTML(
+          `
+          <div style="padding: 10px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">Unable to find your location</h3>
+            <p style="margin: 0; font-size: 12px;">Showing default location (Paris). You can navigate to your area.</p>
+          </div>
+        `
+        )
+        .addTo(map)
+
+      setTimeout(() => popup.remove(), 5000)
     })
 
     map.once("load", () => {
+      calculateMapRadius()
       const started = geolocate.trigger()
       if (!started) {
         allowMoveEndFetch = true
@@ -84,6 +138,7 @@ export default function MapBox() {
 
     return () => {
       map.off("moveend", onMoveEnd)
+      map.off("zoomend", calculateMapRadius)
       markersRef.current.forEach((marker) => marker.remove())
       markersRef.current.clear()
       map.remove()
@@ -103,7 +158,6 @@ export default function MapBox() {
       stations.map((s: Station) => s.externalId)
     )
 
-    // Remove markers for stations that are no longer in the list
     markers.forEach((marker, stationId) => {
       if (!currentStationIds.has(stationId)) {
         marker.remove()
@@ -111,7 +165,6 @@ export default function MapBox() {
       }
     })
 
-    // Add markers for new stations
     stations.forEach((station: Station) => {
       if (!markers.has(station.externalId)) {
         const root = document.createElement("div")
