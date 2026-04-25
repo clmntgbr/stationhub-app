@@ -12,7 +12,7 @@ export default function MapBoxPopup({ station }: MapBoxPopupProps) {
   return (
     <>
       <p>station.externalId: {station.externalId}</p>
-      <Card className="w-[380px] overflow-hidden shadow-lg">
+      <Card className="block w-[380px] overflow-hidden shadow-lg">
         <Image
           src={"/station.jpg"}
           alt={station.name}

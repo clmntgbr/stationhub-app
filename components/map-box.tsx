@@ -11,16 +11,45 @@ type MarkerMap = Map<string, mapboxgl.Marker>
 const DEFAULT_CENTER: [number, number] = [
   2.3494312437081044, 48.852473724351974,
 ]
+const FETCH_DEBOUNCE_MS = 400
+const MIN_MOVE_METERS = 200
+const MIN_ZOOM_DELTA = 0.5
+
+function getMapRadius(map: mapboxgl.Map): number {
+  const bounds = map.getBounds()
+  const center = map.getCenter()
+  const northPoint = bounds?.getNorth() ?? 0
+  const R = 6371000
+  const deltaLat = ((northPoint - center.lat) * Math.PI) / 180
+  const a = Math.sin(deltaLat / 2) ** 2
+  const distanceKm = (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000
+  return distanceKm * 1.5
+}
+
+function haversineMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371000
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 export default function MapBox() {
   const { stations, fetchStations } = useStation()
-
   const mapRef = useRef<mapboxgl.Map>(null)
   const markersRef = useRef<MarkerMap>(new Map())
 
   useEffect(() => {
-    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-    mapboxgl.accessToken = token
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!
 
     const map = new mapboxgl.Map({
       container: "map",
@@ -29,150 +58,82 @@ export default function MapBox() {
     })
     mapRef.current = map
 
-    let allowMoveEndFetch = false
-    let lastFetchPosition: { lat: number; lng: number; zoom: number } | null =
-      null
+    let enabled = false
+    let lastFetch: { lat: number; lng: number; zoom: number } | null = null
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-    const fetchDefaultStations = () => {
-      const bounds = map.getBounds()
-      if (!bounds) return
-
+    const doFetch = () => {
       const center = map.getCenter()
       const zoom = map.getZoom()
-      const northPoint = bounds.getNorth()
-      const R = 6371000
-      const deltaLat = ((northPoint - center.lat) * Math.PI) / 180
-      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      const distanceInMeters = R * c
-      const radiusInKm = (distanceInMeters / 1000) * 1.5 // Add 50% margin
 
-      lastFetchPosition = { lat: center.lat, lng: center.lng, zoom }
+      if (lastFetch) {
+        const moved = haversineMeters(
+          lastFetch.lat,
+          lastFetch.lng,
+          center.lat,
+          center.lng
+        )
+        const zoomed = Math.abs(zoom - lastFetch.zoom)
+        if (moved < MIN_MOVE_METERS && zoomed < MIN_ZOOM_DELTA) return
+      }
 
+      lastFetch = { lat: center.lat, lng: center.lng, zoom }
       fetchStations({
         latitude: center.lat,
         longitude: center.lng,
-        radius: radiusInKm,
+        radius: getMapRadius(map),
       })
-    }
-
-    const calculateMapRadius = () => {
-      const bounds = map.getBounds()
-      if (!bounds) return
-
-      const center = map.getCenter()
-
-      const northPoint = bounds.getNorth()
-
-      const R = 6371000
-      const deltaLat = ((northPoint - center.lat) * Math.PI) / 180
-
-      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      const distanceInMeters = R * c
-      const distanceInKm = distanceInMeters / 1000
-
-      const zoom = map.getZoom()
-      console.log(
-        `Zoom: ${zoom.toFixed(2)} | Radius (height): ${distanceInKm.toFixed(2)} km | Full height: ${(distanceInKm * 2).toFixed(2)} km | API radius: ${(distanceInKm * 1.5).toFixed(2)} km`
-      )
-
-      return distanceInKm
     }
 
     const onMoveEnd = () => {
-      const radiusInKm = calculateMapRadius()
-
-      if (!allowMoveEndFetch || !radiusInKm) {
-        return
-      }
-
-      const center = map.getCenter()
-      const zoom = map.getZoom()
-
-      // Check if position has significantly changed (>100m or zoom change > 0.5)
-      if (lastFetchPosition) {
-        const R = 6371000 // Earth radius in meters
-        const lat1 = (lastFetchPosition.lat * Math.PI) / 180
-        const lat2 = (center.lat * Math.PI) / 180
-        const deltaLat = ((center.lat - lastFetchPosition.lat) * Math.PI) / 180
-        const deltaLng = ((center.lng - lastFetchPosition.lng) * Math.PI) / 180
-
-        const a =
-          Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-          Math.cos(lat1) *
-            Math.cos(lat2) *
-            Math.sin(deltaLng / 2) *
-            Math.sin(deltaLng / 2)
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        const distance = R * c // Distance in meters
-
-        const zoomDiff = Math.abs(zoom - lastFetchPosition.zoom)
-
-        if (distance < 100 && zoomDiff < 0.5) {
-          return
-        }
-      }
-
-      lastFetchPosition = { lat: center.lat, lng: center.lng, zoom }
-
-      fetchStations({
-        latitude: center.lat,
-        longitude: center.lng,
-        radius: radiusInKm * 1.5, // Add 50% margin
-      })
+      if (!enabled) return
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(doFetch, FETCH_DEBOUNCE_MS)
     }
+
     map.on("moveend", onMoveEnd)
-    map.on("zoomend", calculateMapRadius)
 
     const geolocate = new mapboxgl.GeolocateControl({
-      positionOptions: {
-        enableHighAccuracy: true,
-      },
-      fitBoundsOptions: {
-        maxZoom: 12,
-      },
+      positionOptions: { enableHighAccuracy: true },
+      fitBoundsOptions: { maxZoom: 12 },
       trackUserLocation: true,
       showUserHeading: true,
     })
     map.addControl(geolocate)
+    map.addControl(new mapboxgl.NavigationControl())
+
+    const enableAndFetch = () => {
+      enabled = true
+      doFetch()
+    }
 
     geolocate.on("geolocate", () => {
-      allowMoveEndFetch = true
+      enabled = true
     })
     geolocate.on("error", () => {
-      allowMoveEndFetch = true
-      fetchDefaultStations()
-
+      enableAndFetch()
       const popup = new mapboxgl.Popup({ closeOnClick: true })
         .setLngLat(DEFAULT_CENTER)
         .setHTML(
           `
-          <div style="padding: 10px;">
-            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">Unable to find your location</h3>
-            <p style="margin: 0; font-size: 12px;">Showing default location (Paris). You can navigate to your area.</p>
+          <div style="padding:10px">
+            <h3 style="margin:0 0 8px;font-size:14px;font-weight:bold">Unable to find your location</h3>
+            <p style="margin:0;font-size:12px">Showing default location (Paris). You can navigate to your area.</p>
           </div>
         `
         )
         .addTo(map)
-
       setTimeout(() => popup.remove(), 5000)
     })
 
     map.once("load", () => {
-      calculateMapRadius()
       const started = geolocate.trigger()
-      if (!started) {
-        allowMoveEndFetch = true
-        fetchDefaultStations()
-      }
+      if (!started) enableAndFetch()
     })
 
-    map.addControl(new mapboxgl.NavigationControl())
-
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
       map.off("moveend", onMoveEnd)
-      map.off("zoomend", calculateMapRadius)
       markersRef.current.forEach((marker) => marker.remove())
       markersRef.current.clear()
       map.remove()
@@ -181,43 +142,37 @@ export default function MapBox() {
   }, [fetchStations])
 
   useEffect(() => {
-    if (!mapRef.current || !stations?.length) {
-      return
-    }
+    if (!mapRef.current || !stations?.length) return
 
     const map = mapRef.current
     const markers = markersRef.current
+    const currentIds = new Set(stations.map((s: Station) => s.externalId))
 
-    const currentStationIds = new Set(
-      stations.map((s: Station) => s.externalId)
-    )
-
-    markers.forEach((marker, stationId) => {
-      if (!currentStationIds.has(stationId)) {
+    markers.forEach((marker, id) => {
+      if (!currentIds.has(id)) {
         marker.remove()
-        markers.delete(stationId)
+        markers.delete(id)
       }
     })
 
     stations.forEach((station: Station) => {
-      if (!markers.has(station.externalId)) {
-        const root = document.createElement("div")
-        const markerEl = document.createElement("div")
-        markerEl.className = "marker marker-pop"
-        markerEl.style.backgroundImage = `url("https://docs.mapbox.com/mapbox-gl-js/assets/coffee-cup-marker.svg")`
+      if (markers.has(station.externalId)) return
 
-        root.appendChild(markerEl)
+      const root = document.createElement("div")
+      const markerEl = document.createElement("div")
+      markerEl.className = "marker marker-pop"
+      markerEl.style.backgroundImage = `url("https://docs.mapbox.com/mapbox-gl-js/assets/coffee-cup-marker.svg")`
+      root.appendChild(markerEl)
 
-        const popupNode = document.createElement("div")
-        createRoot(popupNode).render(<MapBoxPopup station={station} />)
+      const popupNode = document.createElement("div")
+      createRoot(popupNode).render(<MapBoxPopup station={station} />)
 
-        const marker = new mapboxgl.Marker({ element: root })
-          .setLngLat([station.address.longitude, station.address.latitude])
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupNode))
-          .addTo(map)
+      const marker = new mapboxgl.Marker({ element: root })
+        .setLngLat([station.address.longitude, station.address.latitude])
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupNode))
+        .addTo(map)
 
-        markers.set(station.externalId, marker)
-      }
+      markers.set(station.externalId, marker)
     })
   }, [stations])
 
