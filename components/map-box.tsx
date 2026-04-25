@@ -30,7 +30,8 @@ export default function MapBox() {
     mapRef.current = map
 
     let allowMoveEndFetch = false
-    let lastFetchPosition: { lat: number; lng: number; zoom: number } | null = null
+    let lastFetchPosition: { lat: number; lng: number; zoom: number } | null =
+      null
 
     const fetchDefaultStations = () => {
       const bounds = map.getBounds()
@@ -47,7 +48,7 @@ export default function MapBox() {
       const radiusInKm = (distanceInMeters / 1000) * 1.5 // Add 50% margin
 
       lastFetchPosition = { lat: center.lat, lng: center.lng, zoom }
-      
+
       fetchStations({
         latitude: center.lat,
         longitude: center.lng,
@@ -85,10 +86,10 @@ export default function MapBox() {
       if (!allowMoveEndFetch || !radiusInKm) {
         return
       }
-      
+
       const center = map.getCenter()
       const zoom = map.getZoom()
-      
+
       // Check if position has significantly changed (>100m or zoom change > 0.5)
       if (lastFetchPosition) {
         const R = 6371000 // Earth radius in meters
@@ -96,25 +97,25 @@ export default function MapBox() {
         const lat2 = (center.lat * Math.PI) / 180
         const deltaLat = ((center.lat - lastFetchPosition.lat) * Math.PI) / 180
         const deltaLng = ((center.lng - lastFetchPosition.lng) * Math.PI) / 180
-        
-        const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-                  Math.cos(lat1) * Math.cos(lat2) *
-                  Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2)
+
+        const a =
+          Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+          Math.cos(lat1) *
+            Math.cos(lat2) *
+            Math.sin(deltaLng / 2) *
+            Math.sin(deltaLng / 2)
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         const distance = R * c // Distance in meters
-        
+
         const zoomDiff = Math.abs(zoom - lastFetchPosition.zoom)
-        
-        // Skip fetch if movement is less than 100m and zoom change is less than 0.5
+
         if (distance < 100 && zoomDiff < 0.5) {
-          console.log(`Skipping fetch - movement: ${distance.toFixed(0)}m, zoom diff: ${zoomDiff.toFixed(2)}`)
           return
         }
       }
-      
+
       lastFetchPosition = { lat: center.lat, lng: center.lng, zoom }
-      
-      console.log(`Fetching stations at ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`)
+
       fetchStations({
         latitude: center.lat,
         longitude: center.lng,
